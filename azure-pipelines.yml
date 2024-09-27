@@ -27,7 +27,7 @@ stages:
           - task: PublishTestResults@2
             displayName: 'Publish Junit Test Results'
             inputs:
-              testResultsFiles: '**/surefire-reports/TEST-*.xml'
+              testResultsFiles: '**/TEST-*.xml'
               testRunTitle: 'JUnit Test Results'
               mergeTestResults: true
         
