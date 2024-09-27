@@ -1,0 +1,89 @@
+trigger:
+  branches:
+    include:
+      - master
+
+pool:
+  vmImage: ubuntu-latest
+
+stages:
+  - stage: Build
+    displayName: 'Maven Building'
+    jobs:
+      - job: Building
+        steps:
+          - task: Maven@4
+            displayName: 'Maven Build and Test'
+            inputs:
+              mavenPomFile: 'pom.xml'
+              goals: 'clean verify' # Ensure JaCoCo report is generated
+              options: '-DskipTests=false'
+              javaHomeOption: 'JDKVersion'
+              jdkVersionOption: '17'
+              mavenVersionOption: 'Default'
+              mavenAuthenticateFeed: false
+              effectivePomSkip: false
+
+          - task: PublishTestResults@2
+            displayName: 'Publish Junit Test Results'
+            inputs:
+              testResultsFiles: '**/surefire-reports/TEST-*.xml'
+              testRunTitle: 'JUnit Test Results'
+              mergeTestResults: true
+        
+          - task: PublishCodeCoverageResults@2
+            displayName: 'Publish Code Coverage Results'
+            inputs:
+              summaryFileLocation: '**/target/site/jacoco/jacoco.xml'
+              failIfCoverageEmpty: true
+
+  - stage: SAST
+    displayName: 'Static Application and Security Testing'
+    jobs:
+      - job: 
+        steps:
+          - task: SonarCloudPrepare@2
+            displayName: 'SonarCloud Analysis Preparation'
+            inputs:
+              SonarCloud: 'job-app-sc'
+              organization: 'jami0231key'
+              scannerMode: 'CLI'
+              configMode: 'manual'
+              cliProjectKey: 'jobapp_key'
+              cliProjectName: 'jobapp'
+              cliSources: 'src/main/java'
+              extraProperties: |
+                sonar.junit.reportPaths=target/surefire-reports
+                sonar.jacoco.reportPaths=target/site/jacoco/jacoco.xml
+          
+          - task: Maven@4
+            displayName: 'Run SonarCloud Analysis'
+            inputs:
+              mavenPomFile: 'pom.xml'
+              goals: 'sonar:sonar'
+              javaHomeOption: 'JDKVersion'
+              jdkVersionOption: '17'
+              mavenVersionOption: 'Default'
+              mavenAuthenticateFeed: false
+              effectivePomSkip: false
+              sonarQubeRunAnalysis: false
+          
+          - task: SonarCloudPublish@2
+            displayName: 'Publish SonarCloud Quality Gate Result'
+            inputs:
+              pollingTimeoutSec: '300'
+  
+  - stage: SCA
+    displayName: 'Software Compliance Analysis'
+    jobs:
+      - job:
+        steps:
+          - task: SnykSecurityScan@1
+            displayName: 'Software Compliance Analysis by Snyk Security'
+            inputs:
+              serviceConnectionEndpoint: 'job-app-snyk-sc'
+              testType: 'app'
+              monitorWhen: 'always'
+              failOnIssues: false
+              
+      
